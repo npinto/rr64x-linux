@@ -1,0 +1,53 @@
+diff --git a/osm/linux/os_linux.c b/osm/linux/os_linux.c
+index cf30c4b..0c6fe51 100644
+--- a/osm/linux/os_linux.c
++++ b/osm/linux/os_linux.c
+@@ -260,7 +260,7 @@ void refresh_sd_flags(PVBUS_EXT vbus_ext)
+ 					struct block_device *bdev = bdget(MKDEV(major[i], minor));
+ 					if (bdev &&
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28)
+-						blkdev_get(bdev, FMODE_READ)
++						blkdev_get(bdev, FMODE_READ, NULL)
+ #else 
+ 						blkdev_get(bdev, FMODE_READ, 0 __BDEV_RAW)
+ #endif
+diff --git a/osm/linux/osm_linux.c b/osm/linux/osm_linux.c
+index 7200a02..20febfd 100644
+--- a/osm/linux/osm_linux.c
++++ b/osm/linux/osm_linux.c
+@@ -922,7 +922,7 @@ static void hpt_scsi_start_stop_done(PCOMMAND pCmd)
+ 	}
+ }
+ 
+-static int hpt_queuecommand (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
++static int hpt_queuecommand_lck (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
+ {
+ 	struct Scsi_Host *phost = sc_host(SCpnt);
+ 	PVBUS_EXT vbus_ext = get_vbus_ext(phost);
+@@ -1456,6 +1456,11 @@ cmd_done:
+ 	return 0;
+ }
+ 
++#ifdef DEF_SCSI_QCMD
++DEF_SCSI_QCMD(hpt_queuecommand)
++#else
++#define hpt_queuecommand hpt_queuecommand_lck
++#endif
+ static int hpt_reset (Scsi_Cmnd *SCpnt)
+ {
+ 	PVBUS_EXT vbus_ext = get_vbus_ext(sc_host(SCpnt));
+diff --git a/osm/linux/osm_linux.h b/osm/linux/osm_linux.h
+index 78c6e57..78875f2 100644
+--- a/osm/linux/osm_linux.h
++++ b/osm/linux/osm_linux.h
+@@ -8,10 +8,6 @@
+ 
+ /* system headers */
+ 
+-#ifndef AUTOCONF_INCLUDED
+-#include <linux/config.h>
+-#endif
+-
+ #include <linux/version.h>
+ 
+ #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)) && defined(MODVERSIONS)
